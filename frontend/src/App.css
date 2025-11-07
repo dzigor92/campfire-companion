@@ -1,0 +1,170 @@
+.app-shell {
+  min-height: 100vh;
+  padding: 3rem clamp(1.5rem, 4vw, 5rem) 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  background: radial-gradient(circle at top right, #1d2636, #0e121b 55%);
+  color: #f0f4ff;
+}
+
+.hero {
+  max-width: 720px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 0.8rem;
+  color: #90f0ff;
+  margin-bottom: 1rem;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  margin: 0 0 1rem;
+  line-height: 1.2;
+}
+
+.lede {
+  font-size: 1.1rem;
+  color: #d5def9;
+  margin-bottom: 1.5rem;
+}
+
+.cta-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cta {
+  padding: 0.85rem 1.8rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.cta:focus-visible {
+  outline: 3px solid #90f0ff;
+  outline-offset: 3px;
+}
+
+.cta.primary {
+  background: linear-gradient(120deg, #ff914d, #ff635e);
+  color: #1c0f0c;
+}
+
+.cta.ghost {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #f0f4ff;
+  background: transparent;
+}
+
+.cta:hover {
+  transform: translateY(-2px);
+}
+
+.status-card {
+  background: rgba(7, 10, 19, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.2rem;
+  padding: 1.8rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.status-chip[data-variant="success"] {
+  background: rgba(144, 240, 255, 0.15);
+  color: #90f0ff;
+}
+
+.status-chip[data-variant="error"] {
+  background: rgba(255, 99, 94, 0.15);
+  color: #ff9a9a;
+}
+
+.status-text {
+  font-size: 1.4rem;
+  margin: 0 0 0.5rem;
+}
+
+.status-subtext {
+  margin: 0;
+  color: rgba(240, 244, 255, 0.65);
+  line-height: 1.4;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.card p {
+  margin: 0;
+  color: rgba(240, 244, 255, 0.7);
+}
+
+.highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.highlight {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0.9rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.highlight-label {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.7rem;
+  color: rgba(240, 244, 255, 0.5);
+  margin: 0 0 0.4rem;
+}
+
+.highlight-value {
+  margin: 0;
+  font-size: 1rem;
+  color: #f0f4ff;
+}
+
+@media (max-width: 600px) {
+  .app-shell {
+    padding: 2rem 1.5rem 3rem;
+  }
+
+  .cta-row {
+    flex-direction: column;
+  }
+}
