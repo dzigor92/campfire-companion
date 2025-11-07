@@ -1,0 +1,24 @@
+query Club_Query(
+    $clubId: ID!
+) {
+    club(id: $clubId) {
+        id
+        name
+        game
+        visibility
+        amIMember
+        avatarUrl
+        badgeGrants
+        createdByCommunityAmbassador
+        creator {
+            id
+            username
+            displayName
+            avatarUrl
+            badges {
+                badgeType
+                alias
+            }
+        }
+    }
+}

@@ -136,3 +136,9 @@ REST_FRAMEWORK = {
         "rest_framework.parsers.JSONParser",
     ],
 }
+
+CAMPFIRE = {
+    "EVERY_SECONDS": 1,
+    "BURST": 40,
+    "MAX_RETRIES": 3,
+}
