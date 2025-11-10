@@ -32,6 +32,18 @@ export async function storeCampfireToken(token) {
   return handleResponse(response);
 }
 
+export async function importCampfireClubHistory(clubReference) {
+  const response = await fetch(
+    `${API_BASE_URL}/campfire/clubs/import-history/`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ club: clubReference }),
+    }
+  );
+  return handleResponse(response);
+}
+
 export async function lookupCampfireClub({ query, id, url }) {
   const params = new URLSearchParams();
   if (query) {

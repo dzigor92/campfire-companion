@@ -3,6 +3,7 @@ import "./App.css";
 import {
   getHealth,
   importCampfireEvent,
+  importCampfireClubHistory,
   lookupCampfireClub,
   storeCampfireToken,
 } from "./api/client";
@@ -51,6 +52,12 @@ function App() {
   });
   const [clubLookup, setClubLookup] = useState("");
   const [clubState, setClubState] = useState({
+    loading: false,
+    data: null,
+    error: null,
+  });
+  const [clubHistoryInput, setClubHistoryInput] = useState("");
+  const [clubHistoryState, setClubHistoryState] = useState({
     loading: false,
     data: null,
     error: null,
@@ -306,6 +313,78 @@ function App() {
                       – Rank {clubState.data.creator.club_rank}
                     </>
                   )}
+                </p>
+              )}
+            </div>
+          )}
+        </article>
+
+        <article className="form-card">
+          <div>
+            <p className="eyebrow">Club History Import</p>
+            <h3>Pull every meetup for a club.</h3>
+            <p className="lede small">
+              Give us the same club link or ID and we will fetch all archived meetups,
+              store their rosters, and return a quick summary for your tracker tools.
+            </p>
+          </div>
+          <form
+            className="form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!clubHistoryInput.trim()) {
+                setClubHistoryState((state) => ({
+                  ...state,
+                  error: "Enter a club reference.",
+                }));
+                return;
+              }
+              setClubHistoryState({ loading: true, data: null, error: null });
+              try {
+                const data = await importCampfireClubHistory(clubHistoryInput.trim());
+                setClubHistoryState({ loading: false, data, error: null });
+                setClubHistoryInput("");
+              } catch (error) {
+                setClubHistoryState({
+                  loading: false,
+                  data: null,
+                  error: error.message,
+                });
+              }
+            }}
+          >
+            <label className="form-group">
+              <span>Club link or ID</span>
+              <textarea
+                rows="3"
+                value={clubHistoryInput}
+                onChange={(event) => setClubHistoryInput(event.target.value)}
+                placeholder="Paste any campfire.onelink link or UUID"
+              />
+            </label>
+            <button
+              className="cta primary"
+              type="submit"
+              disabled={clubHistoryState.loading}
+            >
+              {clubHistoryState.loading ? "Importing..." : "Import Club History"}
+            </button>
+            {clubHistoryState.error && (
+              <p className="form-error">{clubHistoryState.error}</p>
+            )}
+          </form>
+          {clubHistoryState.data && (
+            <div className="result-card">
+              <h4>{clubHistoryState.data.club.name}</h4>
+              <p className="hint">
+                Imported {clubHistoryState.data.events_imported} events for{" "}
+                {clubHistoryState.data.club.id}.
+              </p>
+              {clubHistoryState.data.event_ids?.length > 0 && (
+                <p className="hint">
+                  Latest IDs:{" "}
+                  {clubHistoryState.data.event_ids.slice(0, 3).join(", ")}
+                  {clubHistoryState.data.event_ids.length > 3 && " …"}
                 </p>
               )}
             </div>

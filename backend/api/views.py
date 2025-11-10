@@ -130,3 +130,49 @@ def campfire_lookup_club(request):
     club = CampfireClub.objects.select_related("creator").get(pk=club.pk)
     serializer = CampfireClubSerializer(club, context={"request": request})
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+def campfire_import_club_history(request):
+    """Import all historical meetups for a club."""
+    reference = (request.data.get("club") or "").strip()
+    if not reference:
+        return Response({"detail": "Provide a club reference."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        club_url, club_id = normalize_club_lookup(reference, strict=True)
+    except ClubLookupError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    client = build_campfire_client()
+    try:
+        if club_url:
+            club_data = client.resolve_club(club_url)
+            club_id = club_data.id
+        else:
+            club_data = client.get_club(club_id or "")
+    except CampfireError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        events = client.get_past_meetups(club_id or club_data.id)
+    except CampfireError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    imported_ids: list[str] = []
+    for event in events:
+        persist_event(event)
+        imported_ids.append(event.id)
+
+    club = persist_club(club_data)
+    club = CampfireClub.objects.select_related("creator").get(pk=club.pk)
+    serializer = CampfireClubSerializer(club, context={"request": request})
+
+    return Response(
+        {
+            "club": serializer.data,
+            "events_imported": len(imported_ids),
+            "event_ids": imported_ids,
+        },
+        status=status.HTTP_200_OK,
+    )
