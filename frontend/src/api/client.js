@@ -23,12 +23,28 @@ export async function importCampfireEvent(eventReference) {
   return handleResponse(response);
 }
 
-export async function lookupCampfireClub({ id, url }) {
+export async function storeCampfireToken(token) {
+  const response = await fetch(`${API_BASE_URL}/campfire/tokens/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  return handleResponse(response);
+}
+
+export async function lookupCampfireClub({ query, id, url }) {
   const params = new URLSearchParams();
-  if (id) params.set("id", id);
-  if (url) params.set("url", url);
-  const response = await fetch(
-    `${API_BASE_URL}/campfire/clubs/lookup/?${params.toString()}`
-  );
+  if (query) {
+    params.set("club", query);
+  } else {
+    if (id) params.set("id", id);
+    if (url) params.set("url", url);
+  }
+
+  const qs = params.toString();
+  const target = qs
+    ? `${API_BASE_URL}/campfire/clubs/lookup/?${qs}`
+    : `${API_BASE_URL}/campfire/clubs/lookup/`;
+  const response = await fetch(target);
   return handleResponse(response);
 }

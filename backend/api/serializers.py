@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from .models import CampfireClub, CampfireEvent, CampfireEventRSVP, CampfireMember
+from .models import CampfireClub, CampfireEvent, CampfireEventRSVP, CampfireMember, CampfireToken
 
 
 class CampfireMemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = CampfireMember
         fields = ("id", "display_name", "username", "avatar_url", "club_rank")
+
+
+class CampfireTokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CampfireToken
+        fields = ("id", "email", "expires_at", "created_at")
+        read_only_fields = fields
 
 
 class CampfireClubSerializer(serializers.ModelSerializer):

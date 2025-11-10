@@ -1,10 +1,14 @@
+from datetime import timedelta
+
 from django.db import models
 from django.utils import timezone
 
 
 class CampfireTokenQuerySet(models.QuerySet):
     def valid(self):
-        return self.filter(expires_at__gt=timezone.now()).order_by("expires_at")
+        """Return tokens that remain valid for at least another minute."""
+        buffer = timezone.now() + timedelta(minutes=1)
+        return self.filter(expires_at__gt=buffer).order_by("expires_at")
 
 
 class CampfireToken(models.Model):
