@@ -48,19 +48,35 @@ def get_campfire_config() -> CampfireConfig:
     )
 
 
-def _env_token() -> str | None:
-    return os.environ.get("CAMPFIRE_TOKEN") or _cached_settings().token
-
-
-def default_token_provider() -> TokenProvider:
-    env_token = _env_token()
+def env_token_provider() -> TokenProvider:
+    token = os.environ.get("CAMPFIRE_TOKEN") or _cached_settings().token
 
     def provider() -> str | None:
-        if env_token:
-            return env_token
+        return token
+
+    return provider
+
+
+def database_token_provider() -> TokenProvider:
+    def provider() -> str | None:
         return CampfireToken.objects.valid().values_list("token", flat=True).first()
 
     return provider
+
+
+def chained_token_provider(*providers: TokenProvider) -> TokenProvider:
+    def provider() -> str | None:
+        for candidate in providers:
+            token = candidate()
+            if token:
+                return token
+        return None
+
+    return provider
+
+
+def default_token_provider() -> TokenProvider:
+    return chained_token_provider(env_token_provider(), database_token_provider())
 
 
 def build_campfire_client(token_provider: TokenProvider | None = None) -> CampfireClient:
