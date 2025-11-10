@@ -70,9 +70,13 @@ def env_token_provider() -> TokenProvider:
 
 def database_token_provider() -> TokenProvider:
     def provider() -> str | None:
-        return CampfireToken.objects.valid().values_list("token", flat=True).first()
+        return _get_database_token()
 
     return provider
+
+
+def _get_database_token() -> str | None:
+    return CampfireToken.objects.valid().values_list("token", flat=True).first()
 
 
 def chained_token_provider(*providers: TokenSource) -> TokenProvider:
