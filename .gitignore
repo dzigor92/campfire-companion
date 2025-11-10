@@ -17,3 +17,5 @@ frontend/node_modules/
 # Build artifacts
 dist/
 frontend/dist/
+
+.pylintrc
