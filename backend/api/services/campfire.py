@@ -1,6 +1,10 @@
+"""Integration helpers for wiring the shared Campfire client into Django."""
+
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import timedelta
+import functools
 import os
 from typing import Callable
 
@@ -12,21 +16,44 @@ from api.models import CampfireToken
 
 TokenProvider = Callable[[], str | None]
 
+@dataclass(frozen=True)
+class CampfireSettings:
+    every_seconds: int = 1
+    burst: int = 40
+    max_retries: int = 3
+    token: str | None = None
+
+    @classmethod
+    def from_django(cls) -> "CampfireSettings":
+        cfg = getattr(settings, "CAMPFIRE", {})
+        return cls(
+            every_seconds=int(cfg.get("EVERY_SECONDS", cls.every_seconds)),
+            burst=int(cfg.get("BURST", cls.burst)),
+            max_retries=int(cfg.get("MAX_RETRIES", cls.max_retries)),
+            token=cfg.get("TOKEN"),
+        )
+
+
+@functools.lru_cache(maxsize=1)
+def _cached_settings() -> CampfireSettings:
+    return CampfireSettings.from_django()
+
 
 def get_campfire_config() -> CampfireConfig:
-    cfg = getattr(settings, "CAMPFIRE", {})
+    cfg = _cached_settings()
     return CampfireConfig(
-        every=timedelta(seconds=cfg.get("EVERY_SECONDS", 1)),
-        burst=cfg.get("BURST", 40),
-        max_retries=cfg.get("MAX_RETRIES", 3),
+        every=timedelta(seconds=cfg.every_seconds),
+        burst=cfg.burst,
+        max_retries=cfg.max_retries,
     )
+
+
+def _env_token() -> str | None:
+    return os.environ.get("CAMPFIRE_TOKEN") or _cached_settings().token
 
 
 def default_token_provider() -> TokenProvider:
-    env_token = (
-        os.environ.get("CAMPFIRE_TOKEN")
-        or getattr(settings, "CAMPFIRE", {}).get("TOKEN")
-    )
+    env_token = _env_token()
 
     def provider() -> str | None:
         if env_token:
