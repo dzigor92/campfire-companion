@@ -84,13 +84,15 @@ class Member:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Member":
+        badges_data = data.get("badges") or []
+        club_roles_data = data.get("clubRoles") or []
         return cls(
             id=data.get("id", ""),
             username=data.get("username", ""),
             display_name=data.get("displayName", ""),
             avatar_url=data.get("avatarUrl", ""),
-            badges=[Badge.from_dict(b) for b in data.get("badges", [])],
-            club_roles=[ClubRole.from_dict(r) for r in data.get("clubRoles", [])],
+            badges=[Badge.from_dict(b) for b in badges_data],
+            club_roles=[ClubRole.from_dict(r) for r in club_roles_data],
             club_rank=data.get("clubRank"),
             raw=data,
         )
@@ -246,7 +248,8 @@ class Event:
 
 @dataclass(slots=True)
 class PublicEvent:
-    id: str
+    map_object_id: str
+    event_id: str
     name: str
     details: str
     club_name: str
@@ -262,7 +265,8 @@ class PublicEvent:
     def from_dict(cls, data: dict[str, Any]) -> "PublicEvent":
         event = data.get("event", {})
         return cls(
-            id=event.get("id", ""),
+            map_object_id=data.get("id", ""),
+            event_id=event.get("id", ""),
             name=event.get("name", ""),
             details=event.get("details", ""),
             club_name=event.get("clubName", ""),

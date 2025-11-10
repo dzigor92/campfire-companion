@@ -117,12 +117,15 @@ class CampfireClient:
             events = self.get_events([public_id])
             if not events.public_map_objects_by_id:
                 raise CampfireEventNotFound(public_id)
-            first = events.public_map_objects_by_id[0]
-            if first.id != public_id:
+            match = next(
+                (item for item in events.public_map_objects_by_id if item.map_object_id == public_id),
+                None,
+            )
+            if not match:
                 raise CampfireError(
-                    f"Event id mismatch: expected {public_id}, got {first.id}"
+                    f"Event id mismatch: expected {public_id}, got {[item.map_object_id for item in events.public_map_objects_by_id]}"
                 )
-            campfire_event_id = first.event.id
+            campfire_event_id = match.event_id
         else:
             raise CampfireError(
                 "Invalid meetup URL; expected niantic-social, cmpf.re, or campfire discover link"
