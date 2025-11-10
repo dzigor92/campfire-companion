@@ -17,11 +17,11 @@ def extract_club_reference(raw: str | None) -> tuple[str | None, str | None]:
     """
     Scan the provided text for a club deep-link or UUID.
 
-    Mirrors the Go tracker importer by:
-    - splitting on whitespace
-    - preferring an onelink URL if present
-    - otherwise falling back to tokens with 4 hyphens (UUID heuristic)
-    - raising when multiple candidates are present
+    Rules:
+    - split on whitespace
+    - prefer the first campfire.onelink URL if present
+    - otherwise fall back to tokens with 4 hyphens (UUID heuristic)
+    - error when multiple candidates are present
     """
     raw = (raw or "").strip()
     if not raw:
