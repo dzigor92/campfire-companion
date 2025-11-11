@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
-
 
 def get_logger(name: str | None = None) -> logging.Logger:
     """Return a module-scoped logger."""

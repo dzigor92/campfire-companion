@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Iterable
-
 from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime

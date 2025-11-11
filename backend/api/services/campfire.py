@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 import functools
-import logging
 import os
 from typing import Callable
 
