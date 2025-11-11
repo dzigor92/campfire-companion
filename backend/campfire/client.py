@@ -1,3 +1,5 @@
+"""GraphQL client for interacting with the Campfire backend (events, clubs, meetups)."""
+
 from __future__ import annotations
 
 import base64
@@ -71,7 +73,7 @@ CLUB_QUERY = _load_query("club.graphql")
 
 
 class CampfireClient:
-    """Feature-parity port of the Go GraphQL client."""
+    """Campfire GraphQL client exposing high-level helpers (resolve_event, get_club, etc.)."""
 
     def __init__(
         self,
