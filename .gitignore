@@ -19,3 +19,6 @@ dist/
 frontend/dist/
 
 .pylintrc
+
+#VS Code
+.vscode/
