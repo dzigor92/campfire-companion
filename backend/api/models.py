@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -54,6 +55,13 @@ class CampfireClub(models.Model):
         CampfireMember,
         related_name="clubs_created",
         on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        related_name="campfire_club",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )

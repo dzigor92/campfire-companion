@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from django.contrib.auth import authenticate, get_user_model
+
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.authtoken.models import Token
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from campfire import CampfireError
@@ -16,6 +20,8 @@ from .services.campfire import build_campfire_client, get_campfire_config
 from .services.importers import persist_club, persist_event
 from .services.lookups import ClubLookupError, normalize_club_lookup
 from .services.tokens import InvalidCampfireToken, parse_campfire_token
+
+User = get_user_model()
 
 
 @api_view(["GET"])
@@ -38,6 +44,47 @@ def campfire_config(_request):
 
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
+def register_user(request):
+    username = (request.data.get("username") or "").strip()
+    password = request.data.get("password") or ""
+    if not username or not password:
+        return Response({"detail": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+    if len(password) < 8:
+        return Response({"detail": "Password must be at least 8 characters long."}, status=status.HTTP_400_BAD_REQUEST)
+    if User.objects.filter(username=username).exists():
+        return Response({"detail": "Username already taken."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.create_user(username=username, password=password)
+    token, _ = Token.objects.get_or_create(user=user)
+    return Response({"username": user.username, "token": token.key}, status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def login_user(request):
+    username = (request.data.get("username") or "").strip()
+    password = request.data.get("password") or ""
+    if not username or not password:
+        return Response({"detail": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = authenticate(request, username=username, password=password)
+    if not user:
+        return Response({"detail": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
+    token, _ = Token.objects.get_or_create(user=user)
+    return Response({"username": user.username, "token": token.key}, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def logout_user(request):
+    token = getattr(request, "auth", None)
+    if isinstance(token, Token):
+        token.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
 def campfire_import_event(request):
     """Import a Campfire event (by ID or URL) and persist it locally."""
     reference = (request.data.get("event") or "").strip()
@@ -55,7 +102,7 @@ def campfire_import_event(request):
 
     event = persist_event(event_data)
     event = (
-        CampfireEvent.objects.select_related("club", "club__creator", "creator")
+        CampfireEvent.objects.select_related("club", "club__creator", "club__owner", "creator")
         .prefetch_related("rsvps__member")
         .get(pk=event.pk)
     )
@@ -92,6 +139,7 @@ def campfire_tokens(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def campfire_lookup_club(request):
     """Resolve a Campfire club by URL or ID and return the stored representation."""
     tracker_input = (request.query_params.get("club") or request.query_params.get("query") or "").strip()
@@ -127,7 +175,25 @@ def campfire_lookup_club(request):
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
     club = persist_club(club_data)
-    club = CampfireClub.objects.select_related("creator").get(pk=club.pk)
+    club = CampfireClub.objects.select_related("creator", "owner").get(pk=club.pk)
+
+    if club.owner_id and club.owner_id != request.user.id:
+        return Response(
+            {"detail": "This club is already managed by another user."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    owned_club = _get_user_owned_club(request.user)
+    if owned_club and owned_club.id != club.id:
+        return Response(
+            {"detail": f"You already manage the club '{owned_club.name}'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not club.owner_id:
+        club.owner = request.user
+        club.save(update_fields=["owner"])
+
     serializer = CampfireClubSerializer(club, context={"request": request})
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -165,7 +231,7 @@ def campfire_import_club_history(request):
         imported_ids.append(event.id)
 
     club = persist_club(club_data)
-    club = CampfireClub.objects.select_related("creator").get(pk=club.pk)
+    club = CampfireClub.objects.select_related("creator", "owner").get(pk=club.pk)
     serializer = CampfireClubSerializer(club, context={"request": request})
 
     return Response(
@@ -176,3 +242,12 @@ def campfire_import_club_history(request):
         },
         status=status.HTTP_200_OK,
     )
+
+
+def _get_user_owned_club(user):
+    if not user.is_authenticated:
+        return None
+    try:
+        return user.campfire_club
+    except CampfireClub.DoesNotExist:
+        return None

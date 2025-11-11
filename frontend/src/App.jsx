@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import {
+  clearAuthToken,
   getHealth,
-  importCampfireEvent,
   importCampfireClubHistory,
+  importCampfireEvent,
+  loginUser,
+  logoutUser,
   lookupCampfireClub,
+  registerUser,
+  setAuthToken,
   storeCampfireToken,
 } from "./api/client";
 
@@ -39,11 +44,33 @@ const highlights = [
 ];
 
 function App() {
+  const SESSION_KEY = "campfire-companion.session";
   const [health, setHealth] = useState({
     loading: true,
     message: "Checking backend...",
     error: null,
   });
+  const [session, setSession] = useState(() => {
+    if (typeof window === "undefined") {
+      return { username: null, token: null };
+    }
+    try {
+      const cached = localStorage.getItem(SESSION_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.token) {
+          setAuthToken(parsed.token);
+          return parsed;
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to restore session", error);
+    }
+    return { username: null, token: null };
+  });
+  const [authMode, setAuthMode] = useState("login"); // login | register
+  const [authForm, setAuthForm] = useState({ username: "", password: "" });
+  const [authState, setAuthState] = useState({ loading: false, error: null });
   const [eventRef, setEventRef] = useState("");
   const [eventState, setEventState] = useState({
     loading: false,
@@ -68,6 +95,65 @@ function App() {
     data: null,
     error: null,
   });
+  const isAuthenticated = Boolean(session.token);
+
+  function persistSession(nextSession) {
+    setSession(nextSession);
+    if (nextSession?.token) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+      setAuthToken(nextSession.token);
+    } else {
+      localStorage.removeItem(SESSION_KEY);
+      clearAuthToken();
+    }
+  }
+
+  function resetPrivateState() {
+    setEventState({ loading: false, data: null, error: null });
+    setClubState({ loading: false, data: null, error: null });
+    setClubHistoryState({ loading: false, data: null, error: null });
+    setTokenState({ loading: false, data: null, error: null });
+  }
+
+  const handleAuthSuccess = (payload) => {
+    persistSession({ username: payload.username, token: payload.token });
+    setAuthState({ loading: false, error: null });
+    setAuthForm({ username: "", password: "" });
+  };
+
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault();
+    const username = authForm.username.trim();
+    const password = authForm.password;
+    if (!username || !password) {
+      setAuthState((state) => ({
+        ...state,
+        error: "Username and password are required.",
+      }));
+      return;
+    }
+    setAuthState({ loading: true, error: null });
+    try {
+      const payload =
+        authMode === "login"
+          ? await loginUser(username, password)
+          : await registerUser(username, password);
+      handleAuthSuccess(payload);
+    } catch (error) {
+      setAuthState({ loading: false, error: error.message });
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.warn("Logout failed", error);
+    } finally {
+      persistSession({ username: null, token: null });
+      resetPrivateState();
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -99,8 +185,86 @@ function App() {
     return health.error ? "API offline" : "API online";
   }, [health]);
 
+  if (!isAuthenticated) {
+    return (
+      <div className="auth-shell">
+        <div className="auth-card">
+          <p className="eyebrow">Campfire Companion</p>
+          <h1>{authMode === "login" ? "Welcome back" : "Create your account"}</h1>
+          <p className="lede small">
+            {authMode === "login"
+              ? "Sign in to configure your club and pull event insights."
+              : "Register with a username and password so only your team can manage the club."}
+          </p>
+          <form className="auth-form" onSubmit={handleAuthSubmit}>
+            <label className="form-group">
+              <span>Username</span>
+              <input
+                type="text"
+                value={authForm.username}
+                onChange={(event) =>
+                  setAuthForm((form) => ({ ...form, username: event.target.value }))
+                }
+                placeholder="trainer-name"
+                autoComplete="username"
+              />
+            </label>
+            <label className="form-group">
+              <span>Password</span>
+              <input
+                type="password"
+                value={authForm.password}
+                onChange={(event) =>
+                  setAuthForm((form) => ({ ...form, password: event.target.value }))
+                }
+                placeholder="••••••••"
+                autoComplete={authMode === "login" ? "current-password" : "new-password"}
+              />
+            </label>
+            <button className="cta primary" type="submit" disabled={authState.loading}>
+              {authState.loading
+                ? authMode === "login"
+                  ? "Signing in..."
+                  : "Creating account..."
+                : authMode === "login"
+                  ? "Sign in"
+                  : "Create account"}
+            </button>
+            {authState.error && <p className="form-error">{authState.error}</p>}
+          </form>
+          <div className="auth-switch">
+            <p>
+              {authMode === "login"
+                ? "Need an account?"
+                : "Already have an account?"}{" "}
+              <button
+                type="button"
+                onClick={() =>
+                  setAuthMode((mode) => (mode === "login" ? "register" : "login"))
+                }
+              >
+                {authMode === "login" ? "Register" : "Sign in"}
+              </button>
+            </p>
+          </div>
+          <p className="hint">
+            Status: <strong>{statusChip}</strong> • {health.message}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
+      <div className="user-banner">
+        <p>
+          Signed in as <strong>{session.username}</strong>
+        </p>
+        <button className="logout-btn" type="button" onClick={handleLogout}>
+          Log out
+        </button>
+      </div>
       <header className="hero">
         <p className="eyebrow">Campfire Companion</p>
         <h1>
@@ -294,6 +458,13 @@ function App() {
                 <strong>Community Ambassador Club:</strong>{" "}
                 {clubState.data.created_by_community_ambassador ? "Yes" : "No"}
               </p>
+              <p>
+                <strong>Owner:</strong>{" "}
+                {clubState.data.owner_username || "Unclaimed"}
+              </p>
+              {clubState.data.is_owned_by_me && (
+                <p className="hint success">You manage this club.</p>
+              )}
               <div className="pill-list">
                 {(clubState.data.badge_grants ?? []).map((badge) => (
                   <span className="pill" key={badge}>

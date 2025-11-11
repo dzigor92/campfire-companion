@@ -20,6 +20,8 @@ class CampfireTokenSerializer(serializers.ModelSerializer):
 
 class CampfireClubSerializer(serializers.ModelSerializer):
     creator = CampfireMemberSerializer(read_only=True, allow_null=True)
+    owner_username = serializers.SerializerMethodField()
+    is_owned_by_me = serializers.SerializerMethodField()
 
     class Meta:
         model = CampfireClub
@@ -32,7 +34,20 @@ class CampfireClubSerializer(serializers.ModelSerializer):
             "created_by_community_ambassador",
             "badge_grants",
             "creator",
+            "owner_username",
+            "is_owned_by_me",
         )
+
+    def get_owner_username(self, obj: CampfireClub) -> str | None:
+        if obj.owner:
+            return obj.owner.username
+        return None
+
+    def get_is_owned_by_me(self, obj: CampfireClub) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.owner_id == request.user.id
 
 
 class CampfireEventRSVPSerializer(serializers.ModelSerializer):
