@@ -119,3 +119,23 @@ export async function logoutUser() {
   });
   return handleResponse(response);
 }
+
+export async function linkCampfireAccount({ memberId, username }) {
+  const response = await fetch(`${API_BASE_URL}/auth/campfire/`, {
+    method: "POST",
+    headers: withAuth({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      campfire_member_id: memberId,
+      campfire_username: username,
+    }),
+  });
+  return handleResponse(response);
+}
+
+export async function unlinkCampfireAccount() {
+  const response = await fetch(`${API_BASE_URL}/auth/campfire/`, {
+    method: "DELETE",
+    headers: withAuth({ "Content-Type": "application/json" }),
+  });
+  return handleResponse(response);
+}

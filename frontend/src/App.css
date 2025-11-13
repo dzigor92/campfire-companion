@@ -262,6 +262,13 @@
   gap: 0.75rem;
 }
 
+.link-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;

@@ -49,17 +49,19 @@ class AuthAndClubClaimTests(APITestCase):
         self.register_url = reverse("auth-register")
         self.login_url = reverse("auth-login")
         self.logout_url = reverse("auth-logout")
+        self.link_url = reverse("auth-link-campfire")
         self.lookup_url = reverse("campfire-club-lookup")
         self.password = "TrainerPass123"
 
-    def _register(self, username: str) -> str:
+    def _register(self, username: str) -> dict:
         response = self.client.post(
             self.register_url,
             {"username": username, "password": self.password},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        return response.data["token"]
+        self.assertIn("token", response.data)
+        return response.data
 
     def _authenticate(self, token: str):
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
@@ -70,8 +72,9 @@ class AuthAndClubClaimTests(APITestCase):
     @patch("api.views.build_campfire_client")
     def test_user_registration_and_login(self, mock_build_client):
         mock_build_client.return_value = StubCampfireClient({})
-        token = self._register("ash")
-        self.assertTrue(token)
+        session = self._register("ash")
+        self.assertTrue(session["token"])
+        self.assertIsNone(session["campfire_member_id"])
 
         self._clear_auth()
         response = self.client.post(
@@ -81,14 +84,15 @@ class AuthAndClubClaimTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("token", response.data)
+        self.assertIn("campfire_member_id", response.data)
 
     @patch("api.views.build_campfire_client")
     def test_user_can_claim_club_and_prevent_others(self, mock_build_client):
         club_id = "11111111-1111-1111-1111-111111111111"
         mock_build_client.return_value = StubCampfireClient({club_id: build_club_payload(club_id)})
 
-        token = self._register("ash")
-        self._authenticate(token)
+        session = self._register("ash")
+        self._authenticate(session["token"])
 
         response = self.client.get(self.lookup_url, {"club": club_id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -96,8 +100,8 @@ class AuthAndClubClaimTests(APITestCase):
 
         # Second user cannot claim the same club.
         self._clear_auth()
-        token_two = self._register("misty")
-        self._authenticate(token_two)
+        session_two = self._register("misty")
+        self._authenticate(session_two["token"])
         response_two = self.client.get(self.lookup_url, {"club": club_id})
         self.assertEqual(response_two.status_code, status.HTTP_403_FORBIDDEN)
         self.assertIn("already managed", response_two.data["detail"])
@@ -113,8 +117,8 @@ class AuthAndClubClaimTests(APITestCase):
             }
         )
 
-        token = self._register("brock")
-        self._authenticate(token)
+        session = self._register("brock")
+        self._authenticate(session["token"])
 
         first = self.client.get(self.lookup_url, {"club": club_one})
         self.assertEqual(first.status_code, status.HTTP_200_OK)
@@ -125,3 +129,43 @@ class AuthAndClubClaimTests(APITestCase):
 
         club = CampfireClub.objects.get(pk=club_one)
         self.assertEqual(club.owner.username, "brock")
+
+    @patch("api.views.build_campfire_client")
+    def test_user_can_link_and_unlink_campfire_account(self, mock_build_client):
+        mock_build_client.return_value = StubCampfireClient({})
+        session = self._register("serena")
+        self._authenticate(session["token"])
+
+        response = self.client.post(
+            self.link_url,
+            {"campfire_member_id": "member-123", "campfire_username": "Serena"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["campfire_member_id"], "member-123")
+
+        response = self.client.delete(self.link_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["campfire_member_id"])
+
+    @patch("api.views.build_campfire_client")
+    def test_campfire_member_id_must_be_unique(self, mock_build_client):
+        mock_build_client.return_value = StubCampfireClient({})
+        ash_session = self._register("ash")
+        self._authenticate(ash_session["token"])
+        self.client.post(
+            self.link_url,
+            {"campfire_member_id": "member-shared"},
+            format="json",
+        )
+
+        self._clear_auth()
+        misty_session = self._register("misty")
+        self._authenticate(misty_session["token"])
+        response = self.client.post(
+            self.link_url,
+            {"campfire_member_id": "member-shared"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already linked", response.data["detail"])

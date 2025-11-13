@@ -5,12 +5,14 @@ import {
   getHealth,
   importCampfireClubHistory,
   importCampfireEvent,
+  linkCampfireAccount,
   loginUser,
   logoutUser,
   lookupCampfireClub,
   registerUser,
   setAuthToken,
   storeCampfireToken,
+  unlinkCampfireAccount,
 } from "./api/client";
 
 const features = [
@@ -71,6 +73,11 @@ function App() {
   const [authMode, setAuthMode] = useState("login"); // login | register
   const [authForm, setAuthForm] = useState({ username: "", password: "" });
   const [authState, setAuthState] = useState({ loading: false, error: null });
+  const [linkForm, setLinkForm] = useState({
+    memberId: "",
+    username: "",
+  });
+  const [linkState, setLinkState] = useState({ loading: false, error: null });
   const [eventRef, setEventRef] = useState("");
   const [eventState, setEventState] = useState({
     loading: false,
@@ -96,12 +103,19 @@ function App() {
     error: null,
   });
   const isAuthenticated = Boolean(session.token);
+  const hasLinkedCampfire = Boolean(session.campfire_member_id);
 
   function persistSession(nextSession) {
-    setSession(nextSession);
-    if (nextSession?.token) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
-      setAuthToken(nextSession.token);
+    const sanitized = {
+      username: nextSession?.username ?? null,
+      token: nextSession?.token ?? null,
+      campfire_member_id: nextSession?.campfire_member_id ?? null,
+      campfire_username: nextSession?.campfire_username ?? null,
+    };
+    setSession(sanitized);
+    if (sanitized.token) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(sanitized));
+      setAuthToken(sanitized.token);
     } else {
       localStorage.removeItem(SESSION_KEY);
       clearAuthToken();
@@ -150,8 +164,44 @@ function App() {
     } catch (error) {
       console.warn("Logout failed", error);
     } finally {
-      persistSession({ username: null, token: null });
+      persistSession({
+        username: null,
+        token: null,
+        campfire_member_id: null,
+        campfire_username: null,
+      });
       resetPrivateState();
+    }
+  };
+
+  const handleLinkSubmit = async (event) => {
+    event.preventDefault();
+    const memberId = linkForm.memberId.trim();
+    if (!memberId) {
+      setLinkState((state) => ({ ...state, error: "Add your Campfire member ID." }));
+      return;
+    }
+    setLinkState({ loading: true, error: null });
+    try {
+      const data = await linkCampfireAccount({
+        memberId,
+        username: linkForm.username.trim(),
+      });
+      persistSession(data);
+      setLinkState({ loading: false, error: null });
+    } catch (error) {
+      setLinkState({ loading: false, error: error.message });
+    }
+  };
+
+  const handleUnlinkIdentity = async () => {
+    setLinkState({ loading: true, error: null });
+    try {
+      const data = await unlinkCampfireAccount();
+      persistSession(data);
+      setLinkState({ loading: false, error: null });
+    } catch (error) {
+      setLinkState({ loading: false, error: error.message });
     }
   };
 
@@ -179,6 +229,14 @@ function App() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    setLinkForm((form) => ({
+      ...form,
+      memberId: session.campfire_member_id ?? "",
+      username: session.campfire_username ?? "",
+    }));
+  }, [session.campfire_member_id, session.campfire_username]);
 
   const statusChip = useMemo(() => {
     if (health.loading) return "Connecting...";
@@ -302,6 +360,71 @@ function App() {
       </section>
 
       <section className="actions">
+        <article className="form-card">
+          <div>
+            <p className="eyebrow">Campfire Identity</p>
+            <h3>Link your Campfire member account.</h3>
+            <p className="lede small">
+              We store your Campfire member ID so only verified ambassadors can claim clubs and
+              sync meetups. You can update or remove this link at any time.
+            </p>
+          </div>
+          <form className="form" onSubmit={handleLinkSubmit}>
+            <label className="form-group">
+              <span>Campfire member ID</span>
+              <input
+                type="text"
+                value={linkForm.memberId}
+                onChange={(event) =>
+                  setLinkForm((form) => ({ ...form, memberId: event.target.value }))
+                }
+                placeholder="e.g. 12345678-aaaa-bbbb-cccc-1234567890ab"
+              />
+            </label>
+            <label className="form-group">
+              <span>Display name (optional)</span>
+              <input
+                type="text"
+                value={linkForm.username}
+                onChange={(event) =>
+                  setLinkForm((form) => ({ ...form, username: event.target.value }))
+                }
+                placeholder="Trainer Nickname"
+              />
+            </label>
+            <div className="link-actions">
+              <button className="cta primary" type="submit" disabled={linkState.loading}>
+                {linkState.loading
+                  ? hasLinkedCampfire
+                    ? "Saving..."
+                    : "Linking..."
+                  : hasLinkedCampfire
+                    ? "Update link"
+                    : "Link Campfire account"}
+              </button>
+              {hasLinkedCampfire && (
+                <button
+                  className="cta ghost"
+                  type="button"
+                  onClick={handleUnlinkIdentity}
+                  disabled={linkState.loading}
+                >
+                  {linkState.loading ? "Working..." : "Unlink"}
+                </button>
+              )}
+            </div>
+            {hasLinkedCampfire && (
+              <p className="hint success">
+                Linked as{" "}
+                <strong>
+                  {session.campfire_username || session.campfire_member_id}
+                </strong>
+              </p>
+            )}
+            {linkState.error && <p className="form-error">{linkState.error}</p>}
+          </form>
+        </article>
+
         <article className="form-card">
           <div>
             <p className="eyebrow">Event Import</p>

@@ -29,6 +29,20 @@ class CampfireToken(models.Model):
         return f"{self.email or 'unknown'} ({self.expires_at:%Y-%m-%d %H:%M})"
 
 
+class UserCampfireProfile(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        related_name="campfire_profile",
+        on_delete=models.CASCADE,
+    )
+    campfire_member_id = models.CharField(max_length=64, unique=True)
+    campfire_username = models.CharField(max_length=150, blank=True)
+    linked_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.user.username} → {self.campfire_member_id}"
+
+
 class CampfireMember(models.Model):
     id = models.CharField(primary_key=True, max_length=64)
     username = models.CharField(max_length=150, blank=True)

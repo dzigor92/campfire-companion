@@ -10,7 +10,7 @@ from rest_framework.response import Response
 
 from campfire import CampfireError
 
-from .models import CampfireClub, CampfireEvent, CampfireToken
+from .models import CampfireClub, CampfireEvent, CampfireToken, UserCampfireProfile
 from .serializers import (
     CampfireClubSerializer,
     CampfireEventSerializer,
@@ -22,6 +22,25 @@ from .services.lookups import ClubLookupError, normalize_club_lookup
 from .services.tokens import InvalidCampfireToken, parse_campfire_token
 
 User = get_user_model()
+
+
+def _session_payload(user, token=None) -> dict:
+    profile = getattr(user, "campfire_profile", None)
+    token_value = None
+    if token:
+        token_value = getattr(token, "key", None) or str(token)
+    else:
+        try:
+            token_value = user.auth_token.key
+        except Token.DoesNotExist:
+            token_value = None
+
+    return {
+        "username": user.username,
+        "token": token_value,
+        "campfire_member_id": getattr(profile, "campfire_member_id", None),
+        "campfire_username": getattr(profile, "campfire_username", None),
+    }
 
 
 @api_view(["GET"])
@@ -57,7 +76,7 @@ def register_user(request):
 
     user = User.objects.create_user(username=username, password=password)
     token, _ = Token.objects.get_or_create(user=user)
-    return Response({"username": user.username, "token": token.key}, status=status.HTTP_201_CREATED)
+    return Response(_session_payload(user, token), status=status.HTTP_201_CREATED)
 
 
 @api_view(["POST"])
@@ -72,7 +91,7 @@ def login_user(request):
     if not user:
         return Response({"detail": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
     token, _ = Token.objects.get_or_create(user=user)
-    return Response({"username": user.username, "token": token.key}, status=status.HTTP_200_OK)
+    return Response(_session_payload(user, token), status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
@@ -82,6 +101,40 @@ def logout_user(request):
     if isinstance(token, Token):
         token.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def link_campfire_account(request):
+    user = request.user
+    if request.method == "DELETE":
+        UserCampfireProfile.objects.filter(user=user).delete()
+        return Response(_session_payload(user, request.auth), status=status.HTTP_200_OK)
+
+    member_id = (request.data.get("campfire_member_id") or "").strip()
+    username = (request.data.get("campfire_username") or "").strip()
+    if not member_id:
+        return Response({"detail": "campfire_member_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    existing = (
+        UserCampfireProfile.objects.filter(campfire_member_id=member_id)
+        .exclude(user=user)
+        .first()
+    )
+    if existing:
+        return Response(
+            {"detail": "That Campfire account is already linked to another user."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    UserCampfireProfile.objects.update_or_create(
+        user=user,
+        defaults={
+            "campfire_member_id": member_id,
+            "campfire_username": username,
+        },
+    )
+    return Response(_session_payload(user, request.auth), status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])

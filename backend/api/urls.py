@@ -9,6 +9,7 @@ from .views import (
     health,
     login_user,
     logout_user,
+    link_campfire_account,
     register_user,
 )
 
@@ -17,6 +18,7 @@ urlpatterns = [
     path("auth/register/", register_user, name="auth-register"),
     path("auth/login/", login_user, name="auth-login"),
     path("auth/logout/", logout_user, name="auth-logout"),
+    path("auth/campfire/", link_campfire_account, name="auth-link-campfire"),
     path("campfire/config/", campfire_config, name="campfire-config"),
     path("campfire/events/import/", campfire_import_event, name="campfire-import-event"),
     path("campfire/clubs/import-history/", campfire_import_club_history, name="campfire-import-club-history"),
